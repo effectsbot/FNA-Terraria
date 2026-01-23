@@ -1,0 +1,344 @@
+name: Create bundle
+on: workflow_dispatch
+permissions:
+  contents: write
+  pull-requests: read
+env:
+  BUNDLE_VERSION: "0.3.0"
+  VULKAN_VERSION: "vulkan-sdk-1.4.335.0"
+  VKD3D_VERSION: "vkd3d-1.18"
+  SDL_VERSION: "release-3.4.0"
+  SDL2_COMPAT_VERSION: "release-2.32.62"
+  DXVK_VERSION: "v2.5.3" # Newer versions make Wayland HiDPI scaling blurry
+  FNA_VERSION: "26.01"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: rockylinux:8-minimal
+    steps:
+    - name: 'Set environment variables'
+      run: |
+        echo "DNF_OPTS=--assumeyes --setopt=install_weak_deps=0 --nodocs" >> $GITHUB_ENV
+        echo "NAME=FNA-Terraria-${{ env.BUNDLE_VERSION }}+$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_ENV
+        echo "PATH=/opt/rh/gcc-toolset-10/root/usr/bin:$PATH" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+    - name: 'Add external repositories'
+      run: |
+        rpm -i \
+          https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm \
+          https://pkgs.sysadmins.ws/el8/base/x86_64/raven-release.el8.noarch.rpm
+        rpm --import https://download.mono-project.com/repo/xamarin.gpg
+        curl https://download.mono-project.com/repo/centos8-stable.repo | tee /etc/yum.repos.d/mono-centos8-stable.repo
+        sed -i 's/enabled=0/enabled=1/' /etc/yum.repos.d/Rocky-PowerTools.repo
+        echo 'priority=1' | tee -a /etc/yum.repos.d/Rocky-*.repo
+        sed -i '11i priority=1' /etc/yum.repos.d/epel.repo
+        sed -i '7i priority=99' /etc/yum.repos.d/raven.repo
+        sed -i '15i priority=99' /etc/yum.repos.d/raven.repo
+        sed -i '23i priority=99' /etc/yum.repos.d/raven.repo
+        sed -i '31i priority=99' /etc/yum.repos.d/raven.repo
+
+    - name: 'Install build dependencies'
+      run: |
+        microdnf install ${{ env.DNF_OPTS }} --enablerepo=raven-extras \
+          gcc-toolset-10 \
+          git-core \
+          cmake \
+          alsa-lib-devel \
+          fribidi-devel \
+          pulseaudio-libs-devel \
+          libX11-devel \
+          libXext-devel \
+          libXrandr-devel \
+          libXcursor-devel \
+          libXfixes-devel \
+          libXi-devel \
+          libXScrnSaver-devel \
+          libXtst-devel \
+          dbus-devel \
+          ibus-devel \
+          systemd-devel \
+          mesa-libGL-devel \
+          libxkbcommon-devel \
+          mesa-libGLES-devel \
+          mesa-libEGL-devel \
+          vulkan-devel \
+          wayland-devel \
+          wayland-protocols-devel \
+          libdrm-devel \
+          mesa-libgbm-devel \
+          libusb1-devel \
+          libthai-devel \
+          autoconf \
+          bison \
+          flex \
+          perl-JSON \
+          perl-open \
+          libtool \
+          wine-devel \
+          meson \
+          ccache \
+          diffutils \
+          libdecor-devel \
+          patch \
+          xz \
+          pipewire-jack-audio-connection-kit-devel \
+          glslang-devel-13.1.1-1.el8 \
+          mono-devel-6.12.0.107-0.xamarin.9.epel8 \
+          pipewire-devel-1.0.9-1.el8
+
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+
+    - name: 'Fetch sources'
+      run: |
+        git clone https://github.com/KhronosGroup/Vulkan-Headers.git --depth 1 \
+          --branch ${{ env.VULKAN_VERSION }}
+        git clone https://github.com/KhronosGroup/SPIRV-Headers.git --depth 1 \
+          --branch ${{ env.VULKAN_VERSION }}
+        git clone https://github.com/KhronosGroup/Vulkan-Loader.git --depth 1 \
+          --branch ${{ env.VULKAN_VERSION }}
+        git clone https://github.com/KhronosGroup/SPIRV-Tools.git --depth 1 \
+          --branch ${{ env.VULKAN_VERSION }}
+        git clone https://gitlab.winehq.org/wine/vkd3d.git --depth 1 \
+          --branch ${{ env.VKD3D_VERSION }}
+        git clone https://github.com/libsdl-org/SDL.git --depth 1 \
+          --branch ${{ env.SDL_VERSION }}
+        git clone https://github.com/libsdl-org/sdl2-compat.git --depth 1 \
+          --branch ${{ env.SDL2_COMPAT_VERSION }}
+        git clone https://github.com/doitsujin/dxvk.git --recursive --depth 1 \
+          --branch ${{ env.DXVK_VERSION }}
+        git clone https://github.com/FNA-XNA/FNA.git --recursive --depth 1 \
+          --branch ${{ env.FNA_VERSION }}
+
+    - name: 'Apply patches'
+      run: git -C FNA apply $GITHUB_WORKSPACE/patches/*.patch
+
+    - name: 'Configure ccache'
+      uses: hendrikmuhs/ccache-action@v1.2
+
+    - name: 'Configure Vulkan-Headers'
+      working-directory: Vulkan-Headers
+      run: |
+        cmake \
+        -B build \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+        -D CMAKE_SKIP_INSTALL_RPATH=ON \
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build Vulkan-Headers'
+      working-directory: Vulkan-Headers
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install Vulkan-Headers'
+      working-directory: Vulkan-Headers
+      run: cmake --install build
+
+    - name: 'Configure SPIRV-Headers'
+      working-directory: SPIRV-Headers
+      run: |
+        cmake \
+        -B build \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+        -D CMAKE_SKIP_INSTALL_RPATH=ON \
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build SPIRV-Headers'
+      working-directory: SPIRV-Headers
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install SPIRV-Headers'
+      working-directory: SPIRV-Headers
+      run: cmake --install build
+
+    - name: 'Configure Vulkan-Loader'
+      working-directory: Vulkan-Loader
+      run: |
+        cmake \
+        -B build \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+        -D CMAKE_SKIP_INSTALL_RPATH=ON \
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build Vulkan-Loader'
+      working-directory: Vulkan-Loader
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install Vulkan-Loader'
+      working-directory: Vulkan-Loader
+      run: cmake --install build
+
+    - name: 'Configure SPIRV-Tools'
+      working-directory: SPIRV-Tools
+      run: |
+        cmake \
+        -B build \
+        -D BUILD_SHARED_LIBS=ON \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+        -D CMAKE_SKIP_INSTALL_RPATH=ON \
+        -D SPIRV-Headers_SOURCE_DIR=/usr/local \
+        -D SPIRV_TOOLS_BUILD_STATIC=OFF \
+        -D SPIRV_WERROR=OFF \
+        -D SPIRV_SKIP_EXECUTABLES=ON \
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build SPIRV-Tools'
+      working-directory: SPIRV-Tools
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install SPIRV-Tools'
+      working-directory: SPIRV-Tools
+      run: cmake --install build
+
+    - name: 'Configure vkd3d'
+      working-directory: vkd3d
+      run: |
+        ./autogen.sh
+        ./configure \
+        --prefix=/usr/local \
+        --disable-tests \
+        --disable-doxygen-doc \
+        --disable-opengl \
+        --with-spirv-tools
+
+    - name: 'Build vkd3d'
+      working-directory: vkd3d
+      run: CC="ccache gcc" make -j$(($(nproc) + 1))
+
+    - name: 'Install vkd3d'
+      working-directory: vkd3d
+      run: make install
+
+    - name: 'Configure SDL'
+      working-directory: SDL
+      run: |
+        cmake \
+        -B build \
+        -G Ninja \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D SDL_STATIC=OFF \
+        -D SDL_RPATH=OFF \
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build SDL'
+      working-directory: SDL
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install SDL'
+      working-directory: SDL
+      run: cmake --install build
+
+    - name: 'Configure sdl2-compat'
+      working-directory: sdl2-compat
+      run: |
+        cmake \
+        -B build \
+        -G Ninja \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build sdl2-compat'
+      working-directory: sdl2-compat
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Install sdl2-compat'
+      working-directory: sdl2-compat
+      run: cmake --install build
+
+    - name: 'Configure dxvk'
+      working-directory: dxvk
+      run: |
+        CXX="ccache g++" meson setup \
+        --buildtype release \
+        --strip \
+        -D enable_dxgi=true \
+        -D enable_d3d8=false \
+        -D enable_d3d9=false \
+        -D enable_d3d10=false \
+        -D enable_d3d11=true \
+        -D dxvk_native_wsi=sdl2 \
+        build
+
+    - name: 'Build dxvk'
+      working-directory: dxvk
+      run: ninja -C build
+
+    - name: 'Install dxvk'
+      working-directory: dxvk
+      run: ninja -C build install
+
+    - name: 'Configure FAudio'
+      working-directory: FNA/lib/FAudio
+      run: |
+        cmake \
+        -B build \
+        -G Ninja \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SDL3=OFF \
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build FAudio'
+      working-directory: FNA/lib/FAudio
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Configure FNA3D'
+      working-directory: FNA/lib/FNA3D
+      run: |
+        cmake \
+        -B build \
+        -G Ninja \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D BUILD_SDL3=OFF \
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+
+    - name: 'Build FNA3D'
+      working-directory: FNA/lib/FNA3D
+      run: cmake --build build -j$(($(nproc) + 1))
+
+    - name: 'Build Theorafile'
+      working-directory: FNA/lib/Theorafile
+      run: CC="ccache gcc" make -j$(($(nproc) + 1))
+
+    - name: 'Build FNA'
+      working-directory: FNA
+      run: msbuild /p:Configuration=Release /p:Platform=x64 FNA.sln
+
+    - name: 'Set bundle path'
+      run: echo "BUNDLE=$GITHUB_WORKSPACE/${{ env.NAME }}" >> $GITHUB_ENV
+
+    - name: 'Copy libraries to bundle'
+      run: |
+        mkdir -p ${{ env.BUNDLE }}/lib64
+        cp FNA/bin/Release/* ${{ env.BUNDLE }}
+        cat /usr/local/lib64/libdxvk_d3d11.so.0 > ${{ env.BUNDLE }}/lib64/libdxvk_d3d11.so.0
+        cat /usr/local/lib64/libdxvk_dxgi.so.0 > ${{ env.BUNDLE }}/lib64/libdxvk_dxgi.so.0
+        cat /usr/local/lib64/libSDL3.so.0 > ${{ env.BUNDLE }}/lib64/libSDL3.so.0
+        cat /usr/local/lib64/libSDL2-2.0.so.0 > ${{ env.BUNDLE }}/lib64/libSDL2-2.0.so.0
+        cat /usr/local/lib/libvkd3d.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d.so.1
+        cat /usr/local/lib/libvkd3d-shader.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d-shader.so.1
+        cat /usr/local/lib/libvkd3d-utils.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d-utils.so.1
+        cat /usr/local/lib64/libSPIRV-Tools-shared.so > ${{ env.BUNDLE }}/lib64/libSPIRV-Tools-shared.so
+        cat FNA/lib/FAudio/build/libFAudio.so.0 > ${{ env.BUNDLE }}/lib64/libFAudio.so.0
+        cat FNA/lib/FNA3D/build/libFNA3D.so.0 > ${{ env.BUNDLE }}/lib64/libFNA3D.so.0
+        cp FNA/lib/Theorafile/libtheorafile.so ${{ env.BUNDLE }}/lib64
+
+    - name: 'Make artifacts'
+      run: |
+        cd "${{ env.BUNDLE }}"/..
+        XZ_OPT=-9 tar -Jcf "${{ env.NAME }}.tar.xz" "$(basename ${{ env.BUNDLE }})"
+
+    - name: 'Upload artifacts'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.NAME }}
+        path: ${{ env.NAME }}.tar.xz
