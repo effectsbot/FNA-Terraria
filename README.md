@@ -23,7 +23,7 @@ Everything in lib64 --> $HOME/.var/app/com.valvesoftware.Steam/data/Steam/steama
 The features mentioned above require adding launch options to Terraria's properties inside of Steam. Add `%command%` to the launch options before following the instructions below.
 
 - Add `/gldevice:D3D11` after `%command%` to enable the D3D11 renderer
-- Add `SDL_VIDEO_WAYLAND_SCALE_TO_DISPLAY=1` before `%command%` to enable HiDPI scaling on Wayland (requires SDL_VIDEO_DRIVER=wayland to be set)
+- Add `SDL_VIDEO_WAYLAND_SCALE_TO_DISPLAY=1` before `%command%` to enable HiDPI scaling on Wayland (requires `SDL_VIDEO_DRIVER=wayland` to be set)
 - Add `SDL_AUDIODRIVER=pipewire` before `%command%` to enable native PipeWire audio
 
 ## How do I revert everything back to default?
