@@ -24,7 +24,7 @@ The features mentioned above require adding launch options to Terraria's propert
 
 - Add `/gldevice:D3D11` after `%command%` to enable the D3D11 renderer
 - Add `SDL_VIDEO_WAYLAND_SCALE_TO_DISPLAY=1` before `%command%` to enable HiDPI scaling on Wayland (requires `SDL_VIDEO_DRIVER=wayland` to be set)
-- Add `SDL_AUDIODRIVER=pipewire` before `%command%` to enable native PipeWire audio
+- Add `SDL_AUDIO_DRIVER=pipewire` before `%command%` to enable native PipeWire audio
 
 ## How do I revert everything back to default?
 Remove the `lib64` folder inside of the game's directory, then verify the integrity of the game's files from its properties and remove all of the launch options.
