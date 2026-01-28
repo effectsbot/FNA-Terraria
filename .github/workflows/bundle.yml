@@ -108,8 +108,8 @@ jobs:
         git clone https://github.com/FNA-XNA/FNA.git --recursive --depth 1 \
           --branch ${{ env.FNA_VERSION }}
 
-    - name: 'Apply patches'
-      run: git -C FNA apply $GITHUB_WORKSPACE/patches/*.patch
+    # - name: 'Apply patches'
+    #   run: git -C FNA apply $GITHUB_WORKSPACE/patches/*.patch
 
     - name: 'Configure ccache'
       uses: hendrikmuhs/ccache-action@v1.2
