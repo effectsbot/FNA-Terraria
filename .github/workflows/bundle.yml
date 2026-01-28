@@ -4,11 +4,10 @@ permissions:
   contents: write
   pull-requests: read
 env:
-  BUNDLE_VERSION: "1.0.0"
+  BUNDLE_VERSION: "1.1.0"
   VULKAN_VERSION: "vulkan-sdk-1.4.335.0"
   VKD3D_VERSION: "vkd3d-1.18"
   SDL_VERSION: "release-3.4.0"
-  SDL2_COMPAT_VERSION: "release-2.32.62"
   DXVK_VERSION: "v2.5.3" # Newer versions make Wayland HiDPI scaling blurry
   FNA_VERSION: "26.01"
 jobs:
@@ -104,8 +103,6 @@ jobs:
           --branch ${{ env.VKD3D_VERSION }}
         git clone https://github.com/libsdl-org/SDL.git --depth 1 \
           --branch ${{ env.SDL_VERSION }}
-        git clone https://github.com/libsdl-org/sdl2-compat.git --depth 1 \
-          --branch ${{ env.SDL2_COMPAT_VERSION }}
         git clone https://github.com/doitsujin/dxvk.git --recursive --depth 1 \
           --branch ${{ env.DXVK_VERSION }}
         git clone https://github.com/FNA-XNA/FNA.git --recursive --depth 1 \
@@ -237,24 +234,6 @@ jobs:
       working-directory: SDL
       run: cmake --install build
 
-    - name: 'Configure sdl2-compat'
-      working-directory: sdl2-compat
-      run: |
-        cmake \
-        -B build \
-        -G Ninja \
-        -D CMAKE_BUILD_TYPE=Release \
-        -D CMAKE_INSTALL_PREFIX=/usr/local \
-        -D CMAKE_C_COMPILER_LAUNCHER=ccache
-
-    - name: 'Build sdl2-compat'
-      working-directory: sdl2-compat
-      run: cmake --build build -j$(($(nproc) + 1))
-
-    - name: 'Install sdl2-compat'
-      working-directory: sdl2-compat
-      run: cmake --install build
-
     - name: 'Configure dxvk'
       working-directory: dxvk
       run: |
@@ -266,7 +245,7 @@ jobs:
         -D enable_d3d9=false \
         -D enable_d3d10=false \
         -D enable_d3d11=true \
-        -D dxvk_native_wsi=sdl2 \
+        -D dxvk_native_wsi=sdl3 \
         build
 
     - name: 'Build dxvk'
@@ -284,7 +263,6 @@ jobs:
         -B build \
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
-        -D BUILD_SDL3=OFF \
         -D CMAKE_C_COMPILER_LAUNCHER=ccache
 
     - name: 'Build FAudio'
@@ -298,7 +276,6 @@ jobs:
         -B build \
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
-        -D BUILD_SDL3=OFF \
         -D CMAKE_C_COMPILER_LAUNCHER=ccache
 
     - name: 'Build FNA3D'
@@ -323,7 +300,6 @@ jobs:
         cat /usr/local/lib64/libdxvk_d3d11.so.0 > ${{ env.BUNDLE }}/lib64/libdxvk_d3d11.so.0
         cat /usr/local/lib64/libdxvk_dxgi.so.0 > ${{ env.BUNDLE }}/lib64/libdxvk_dxgi.so.0
         cat /usr/local/lib64/libSDL3.so.0 > ${{ env.BUNDLE }}/lib64/libSDL3.so.0
-        cat /usr/local/lib64/libSDL2-2.0.so.0 > ${{ env.BUNDLE }}/lib64/libSDL2-2.0.so.0
         cat /usr/local/lib/libvkd3d.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d.so.1
         cat /usr/local/lib/libvkd3d-shader.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d-shader.so.1
         cat /usr/local/lib/libvkd3d-utils.so.1 > ${{ env.BUNDLE }}/lib64/libvkd3d-utils.so.1
