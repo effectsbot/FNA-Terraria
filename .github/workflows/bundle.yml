@@ -4,12 +4,12 @@ permissions:
   contents: write
   pull-requests: read
 env:
-  BUNDLE_VERSION: "1.1.0"
-  VULKAN_VERSION: "vulkan-sdk-1.4.335.0"
-  VKD3D_VERSION: "vkd3d-1.18"
-  SDL_VERSION: "release-3.4.0"
+  BUNDLE_VERSION: "1.2.0"
+  VULKAN_VERSION: "vulkan-sdk-1.4.341.0"
+  VKD3D_VERSION: "vkd3d-1.19"
+  SDL_VERSION: "release-3.4.2"
   DXVK_VERSION: "v2.5.3" # Newer versions make Wayland HiDPI scaling blurry
-  FNA_VERSION: "26.01"
+  FNA_VERSION: "26.03"
 jobs:
   build:
     runs-on: ubuntu-latest
